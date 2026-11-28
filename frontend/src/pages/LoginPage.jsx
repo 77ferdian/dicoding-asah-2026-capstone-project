@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiLock, FiUser, FiArrowRight, FiInfo } from 'react-icons/fi';
 import { useLocale } from '../contexts/LocaleContext';
 import { apiClient } from '../utils/api';
+import { isAuthenticated } from '../utils/auth';
 
 export default function LoginPage() {
   const { t } = useLocale();
@@ -12,6 +13,12 @@ export default function LoginPage() {
   const [password, setPassword] = useState('secret_password123');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+
+  useEffect(() => {
+    if (isAuthenticated()) {
+      navigate('/', { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

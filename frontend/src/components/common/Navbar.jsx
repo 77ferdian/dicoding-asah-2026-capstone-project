@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { FiBarChart2, FiPieChart, FiGlobe, FiLogOut, FiUser } from 'react-icons/fi';
+import { FiBarChart2, FiPieChart, FiGlobe, FiLogOut, FiUser, FiMapPin } from 'react-icons/fi';
 import { useLocale } from '../../contexts/LocaleContext';
 import { getUserInfo } from '../../utils/auth';
 import { apiClient } from '../../utils/api';
@@ -47,6 +47,10 @@ export default function Navbar() {
           <NavLink to="/benchmarking" className={navClass}>
             <FiBarChart2 className="text-base" />
             <span className="hidden sm:inline">{t.benchmarking}</span>
+          </NavLink>
+          <NavLink to="/expansion" className={navClass}>
+            <FiMapPin className="text-base" />
+            <span className="hidden sm:inline">Ekspansi Cabang</span>
           </NavLink>
         </nav>
 
