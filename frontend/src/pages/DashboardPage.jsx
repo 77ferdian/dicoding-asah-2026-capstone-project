@@ -121,14 +121,17 @@ export default function DashboardPage() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-5 flex">
+        <div className="lg:col-span-4 flex">
           <div className="w-full flex">
             <SentimentDonutChart summary={summary} />
           </div>
         </div>
-        <div className="lg:col-span-7 flex">
+        <div className="lg:col-span-8 flex">
           <div className="w-full flex">
-            <AspectBarChart aspectBreakdown={summary?.aspectBreakdown} />
+            <AspectBarChart
+              aspectBreakdown={summary?.aspectBreakdown}
+              timeSeries={summary?.timeSeries}
+            />
           </div>
         </div>
       </div>
