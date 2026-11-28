@@ -1,64 +1,54 @@
 /**
  * ExpansionMap.jsx
- * Peta interaktif menggunakan react-leaflet + OpenStreetMap.
+ * Peta interaktif menggunakan Google Maps (@react-google-maps/api).
  * Menampilkan: cabang utama, kompetitor (warna rating), kandidat, lingkaran radius.
  * Mode klik peta → tambah kandidat sementara.
  */
-import React, { useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import {
+  GoogleMap,
+  useJsApiLoader,
+  MarkerF,
+  InfoWindowF,
+  CircleF,
+} from '@react-google-maps/api';
 
-// Fix default icon Leaflet (diperlukan saat bundling dengan Vite)
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-});
-
-// Icon khusus berbasis HTML/div agar tidak perlu file gambar tambahan
-function createColorIcon(color, emoji) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="background:${color};width:32px;height:32px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;">
-             <span style="transform:rotate(45deg);font-size:14px;">${emoji}</span>
-           </div>`,
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -34],
-  });
-}
-
-const ICONS = {
-  main: createColorIcon('#f97316', '🍜'),
-  candidatePending: createColorIcon('#6366f1', '📍'),
-  candidateSelected: createColorIcon('#7c3aed', '📌'),
-  candidateDefault: createColorIcon('#94a3b8', '📍'),
-  competitorGreen: createColorIcon('#22c55e', '🏪'),
-  competitorYellow: createColorIcon('#eab308', '🏪'),
-  competitorRed: createColorIcon('#ef4444', '🏪'),
+const MAP_CONTAINER_STYLE = {
+  width: '100%',
+  height: '100%',
 };
 
-function competitorIcon(rating) {
-  if (rating >= 4.3) return ICONS.competitorGreen;
-  if (rating >= 3.8) return ICONS.competitorYellow;
-  return ICONS.competitorRed;
-}
-
-function ClickToAdd({ enabled, onPick }) {
-  useMapEvents({
-    click(e) {
-      if (enabled) onPick(e.latlng);
-    },
-  });
-  return null;
-}
-
-ClickToAdd.propTypes = {
-  enabled: PropTypes.bool.isRequired,
-  onPick: PropTypes.func.isRequired,
+const DEFAULT_CENTER = {
+  lat: -7.2575,
+  lng: 112.7521,
 };
+
+function createSvgPin(color) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40">
+      <path d="M16 0C7.163 0 0 7.163 0 16c0 12 16 24 16 24s16-12 16-24C32 7.163 24.837 0 16 0z" fill="${color}" stroke="#ffffff" stroke-width="2.5"/>
+      <circle cx="16" cy="15" r="6" fill="#ffffff"/>
+    </svg>
+  `.trim();
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+const PIN_URLS = {
+  main: createSvgPin('#f97316'),
+  candidatePending: createSvgPin('#6366f1'),
+  candidateSelected: createSvgPin('#7c3aed'),
+  candidateDefault: createSvgPin('#94a3b8'),
+  competitorGreen: createSvgPin('#22c55e'),
+  competitorYellow: createSvgPin('#eab308'),
+  competitorRed: createSvgPin('#ef4444'),
+};
+
+function getCompetitorPin(rating) {
+  if (rating >= 4.3) return PIN_URLS.competitorGreen;
+  if (rating >= 3.8) return PIN_URLS.competitorYellow;
+  return PIN_URLS.competitorRed;
+}
 
 export default function ExpansionMap({
   mapData,
@@ -70,106 +60,207 @@ export default function ExpansionMap({
   onPick,
   onSelectCandidate,
 }) {
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '',
+  });
+
+  const [activeInfo, setActiveInfo] = useState(null);
+
   const main = mapData?.mainBusiness;
   const competitors = mapData?.competitors ?? [];
   const selectedCandidate = candidates?.find((c) => c.id === selectedCandidateId);
 
+  const handleMapClick = useCallback(
+    (e) => {
+      if (addMode && e.latLng) {
+        onPick({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+      } else {
+        setActiveInfo(null);
+      }
+    },
+    [addMode, onPick]
+  );
+
+  if (loadError) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-200 text-sm text-red-600 p-4 text-center">
+        Gagal memuat Google Maps. Periksa koneksi atau VITE_GOOGLE_MAPS_API_KEY.
+      </div>
+    );
+  }
+
+  if (!isLoaded) {
+    return (
+      <div className="h-full w-full flex items-center justify-center bg-slate-50 rounded-2xl border border-slate-200 text-sm text-slate-500">
+        Memuat Google Maps...
+      </div>
+    );
+  }
+
   return (
     <div className="relative h-full w-full rounded-2xl overflow-hidden border border-slate-200 shadow-sm">
       {addMode && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg pointer-events-none">
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-indigo-600 text-white text-xs font-semibold px-4 py-2 rounded-full shadow-lg pointer-events-none">
           🗺️ Klik lokasi di peta untuk menambah kandidat
         </div>
       )}
-      <MapContainer
-        center={[-7.2575, 112.7521]}
+
+      <GoogleMap
+        mapContainerStyle={MAP_CONTAINER_STYLE}
+        center={main ? { lat: main.lat, lng: main.lng } : DEFAULT_CENTER}
         zoom={14}
-        className="h-full w-full"
-        style={{ cursor: addMode ? 'crosshair' : 'grab' }}
-        minZoom={11}
-        maxZoom={18}
+        onClick={handleMapClick}
+        options={{
+          streetViewControl: false,
+          mapTypeControl: false,
+          fullscreenControl: true,
+          draggableCursor: addMode ? 'crosshair' : 'grab',
+        }}
       >
-        <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        />
-
-        <ClickToAdd enabled={addMode} onPick={onPick} />
-
         {/* Cabang Utama */}
         {main && (
-          <Marker position={[main.lat, main.lng]} icon={ICONS.main}>
-            <Popup>
-              <strong className="text-orange-600">🍜 {main.name}</strong>
-              <br />⭐ {main.rating} · {main.reviewCount} ulasan
-              <br /><span className="text-xs text-slate-500">Cabang Utama</span>
-            </Popup>
-          </Marker>
+          <MarkerF
+            position={{ lat: main.lat, lng: main.lng }}
+            icon={{ url: PIN_URLS.main }}
+            onClick={() => setActiveInfo({ type: 'main', data: main })}
+          />
         )}
 
         {/* Kompetitor */}
         {competitors.map((c) => (
-          <Marker key={c.id} position={[c.lat, c.lng]} icon={competitorIcon(c.rating)}>
-            <Popup>
-              <strong>{c.name}</strong>
-              <br />⭐ {c.rating} · {c.reviewCount} ulasan
-              <br /><span className="text-xs text-slate-400">Jarak: ~{c.distanceM} m dari pusat</span>
-              <br />
-              <span className={`text-xs font-semibold ${c.rating >= 4.3 ? 'text-green-600' : c.rating >= 3.8 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {c.rating >= 4.3 ? '● Kompetitor Kuat' : c.rating >= 3.8 ? '● Kompetitor Sedang' : '● Kompetitor Lemah'}
-              </span>
-            </Popup>
-          </Marker>
+          <MarkerF
+            key={c.id}
+            position={{ lat: c.lat, lng: c.lng }}
+            icon={{ url: getCompetitorPin(c.rating) }}
+            onClick={() => setActiveInfo({ type: 'competitor', data: c })}
+          />
         ))}
 
         {/* Kandidat yang sudah tersimpan */}
         {candidates?.map((c) => {
           const isSelected = c.id === selectedCandidateId;
           return (
-            <Marker
+            <MarkerF
               key={c.id}
-              position={[c.lat, c.lng]}
-              icon={isSelected ? ICONS.candidateSelected : ICONS.candidateDefault}
-              eventHandlers={{ click: () => onSelectCandidate(c.id) }}
-            >
-              <Popup>
-                <strong className="text-indigo-600">📍 {c.label}</strong>
-                <br />
-                <button
-                  className="mt-1 text-xs text-indigo-600 underline"
-                  onClick={() => onSelectCandidate(c.id)}
-                >
-                  Pilih & Analisis
-                </button>
-              </Popup>
-            </Marker>
+              position={{ lat: c.lat, lng: c.lng }}
+              icon={{
+                url: isSelected ? PIN_URLS.candidateSelected : PIN_URLS.candidateDefault,
+              }}
+              onClick={() => {
+                onSelectCandidate(c.id);
+                setActiveInfo({ type: 'candidate', data: c });
+              }}
+            />
           );
         })}
 
         {/* Lingkaran radius kandidat terpilih */}
         {selectedCandidate && (
-          <Circle
-            center={[selectedCandidate.lat, selectedCandidate.lng]}
+          <CircleF
+            center={{ lat: selectedCandidate.lat, lng: selectedCandidate.lng }}
             radius={radius}
-            pathOptions={{ color: '#7c3aed', fillColor: '#a78bfa', fillOpacity: 0.12, weight: 2, dashArray: '6 4' }}
+            options={{
+              strokeColor: '#7c3aed',
+              strokeOpacity: 0.8,
+              strokeWeight: 2,
+              fillColor: '#a78bfa',
+              fillOpacity: 0.14,
+            }}
           />
         )}
 
         {/* Pin sementara saat mode tambah */}
         {pendingLatLng && (
-          <Marker position={[pendingLatLng.lat, pendingLatLng.lng]} icon={ICONS.candidatePending}>
-            <Popup>Lokasi baru — konfirmasi di panel kiri</Popup>
-          </Marker>
+          <MarkerF
+            position={{ lat: pendingLatLng.lat, lng: pendingLatLng.lng }}
+            icon={{ url: PIN_URLS.candidatePending }}
+          />
         )}
-      </MapContainer>
+
+        {/* InfoWindow */}
+        {activeInfo?.type === 'main' && (
+          <InfoWindowF
+            position={{ lat: activeInfo.data.lat, lng: activeInfo.data.lng }}
+            onCloseClick={() => setActiveInfo(null)}
+          >
+            <div className="text-xs">
+              <strong className="text-orange-600">🍜 {activeInfo.data.name}</strong>
+              <br />⭐ {activeInfo.data.rating} · {activeInfo.data.reviewCount} ulasan
+              <br />
+              <span className="text-slate-500">Cabang Utama</span>
+            </div>
+          </InfoWindowF>
+        )}
+
+        {activeInfo?.type === 'competitor' && (
+          <InfoWindowF
+            position={{ lat: activeInfo.data.lat, lng: activeInfo.data.lng }}
+            onCloseClick={() => setActiveInfo(null)}
+          >
+            <div className="text-xs">
+              <strong>{activeInfo.data.name}</strong>
+              <br />⭐ {activeInfo.data.rating} · {activeInfo.data.reviewCount} ulasan
+              <br />
+              <span className="text-slate-400">
+                Jarak: ~{activeInfo.data.distanceM} m dari pusat
+              </span>
+              <br />
+              <span
+                className={`font-semibold ${
+                  activeInfo.data.rating >= 4.3
+                    ? 'text-green-600'
+                    : activeInfo.data.rating >= 3.8
+                    ? 'text-yellow-600'
+                    : 'text-red-600'
+                }`}
+              >
+                {activeInfo.data.rating >= 4.3
+                  ? '● Kompetitor Kuat'
+                  : activeInfo.data.rating >= 3.8
+                  ? '● Kompetitor Sedang'
+                  : '● Kompetitor Lemah'}
+              </span>
+            </div>
+          </InfoWindowF>
+        )}
+
+        {activeInfo?.type === 'candidate' && (
+          <InfoWindowF
+            position={{ lat: activeInfo.data.lat, lng: activeInfo.data.lng }}
+            onCloseClick={() => setActiveInfo(null)}
+          >
+            <div className="text-xs">
+              <strong className="text-indigo-600">📍 {activeInfo.data.label}</strong>
+              <br />
+              <button
+                type="button"
+                className="mt-1 text-indigo-600 underline"
+                onClick={() => onSelectCandidate(activeInfo.data.id)}
+              >
+                Pilih & Analisis
+              </button>
+            </div>
+          </InfoWindowF>
+        )}
+      </GoogleMap>
 
       {/* Legenda */}
-      <div className="absolute bottom-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-[10px] shadow border border-slate-100 space-y-0.5">
-        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" /> Cabang Utama</div>
-        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Kompetitor Kuat (≥4.3)</div>
-        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" /> Kompetitor Sedang (3.8-4.2)</div>
-        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> Kompetitor Lemah (&lt;3.8)</div>
-        <div className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" /> Kandidat Cabang</div>
+      <div className="absolute bottom-3 left-3 z-10 bg-white/90 backdrop-blur-sm rounded-xl px-3 py-2 text-[10px] shadow border border-slate-100 space-y-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-500 inline-block" /> Cabang Utama
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Kompetitor Kuat (≥4.3)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 inline-block" /> Kompetitor Sedang (3.8-4.2)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> Kompetitor Lemah (&lt;3.8)
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-purple-600 inline-block" /> Kandidat Cabang
+        </div>
       </div>
     </div>
   );

@@ -9,7 +9,6 @@
 import React, { useState } from 'react';
 import { FiPlusCircle, FiXCircle, FiBarChart2, FiMap } from 'react-icons/fi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import 'leaflet/dist/leaflet.css';
 
 import ExpansionMap from '../components/ExpansionMap';
 import CandidateSearch from '../components/CandidateSearch';
