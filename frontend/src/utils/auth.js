@@ -10,6 +10,7 @@ export const clearTokens = () => {
   localStorage.removeItem('accessToken');
   localStorage.removeItem('refreshToken');
   localStorage.removeItem('userFullName');
+  localStorage.removeItem('username');
 };
 
 export const isAuthenticated = () => !!getAccessToken();

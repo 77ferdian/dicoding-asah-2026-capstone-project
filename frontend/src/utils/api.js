@@ -2,7 +2,8 @@ import axios from 'axios';
 import { getAccessToken, setTokens, clearTokens } from './auth';
 import { mockSummary, mockCompetitors, mockAiInsights } from '../data/mockData';
 
-const isMockMode = import.meta.env.VITE_USE_MOCK === 'true';
+// Default ke mock mode jika VITE_USE_MOCK bernilai 'true' atau belum disetel (undefined saat dev tanpa backend)
+const isMockMode = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === undefined;
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000',
@@ -101,38 +102,53 @@ export const apiClient = {
     }
   },
 
+  _mockLogin(credentials) {
+    if (credentials.username === 'owner_lintang' && credentials.password === 'secret_password123') {
+      const dummy = {
+        accessToken: 'mock_jwt_access_token_' + Date.now(),
+        refreshToken: 'mock_jwt_refresh_token_' + Date.now(),
+      };
+      setTokens(dummy);
+      localStorage.setItem('userFullName', 'Pemilik Lintang Bakso');
+      localStorage.setItem('username', credentials.username);
+      return { status: 'success', data: dummy };
+    }
+    // Boleh login jika memasukkan kredensial saat mode mock
+    if (credentials.username && credentials.password) {
+      const dummy = {
+        accessToken: 'mock_jwt_access_token_' + Date.now(),
+        refreshToken: 'mock_jwt_refresh_token_' + Date.now(),
+      };
+      setTokens(dummy);
+      localStorage.setItem('userFullName', credentials.username);
+      localStorage.setItem('username', credentials.username);
+      return { status: 'success', data: dummy };
+    }
+    throw new Error('Kredensial salah. Gunakan username: owner_lintang & password: secret_password123');
+  },
+
   async login(credentials) {
     if (isMockMode) {
-      await new Promise((r) => setTimeout(r, 500));
-      if (credentials.username === 'owner_lintang' && credentials.password === 'secret_password123') {
-        const dummy = {
-          accessToken: 'mock_jwt_access_token_' + Date.now(),
-          refreshToken: 'mock_jwt_refresh_token_' + Date.now(),
-        };
-        setTokens(dummy);
-        localStorage.setItem('userFullName', 'Pemilik Lintang Bakso');
-        localStorage.setItem('username', credentials.username);
-        return { status: 'success', data: dummy };
-      }
-      // Boleh login jika memasukkan demo akun
-      if (credentials.username && credentials.password) {
-        const dummy = {
-          accessToken: 'mock_jwt_access_token_' + Date.now(),
-          refreshToken: 'mock_jwt_refresh_token_' + Date.now(),
-        };
-        setTokens(dummy);
-        localStorage.setItem('userFullName', credentials.username);
-        localStorage.setItem('username', credentials.username);
-        return { status: 'success', data: dummy };
-      }
-      throw new Error('Kredensial salah. Gunakan username: owner_lintang & password: secret_password123');
+      await new Promise((r) => setTimeout(r, 400));
+      return this._mockLogin(credentials);
     }
-    const res = await api.post('/authentications', credentials);
-    if (res.data?.data) {
-      setTokens(res.data.data);
-      localStorage.setItem('username', credentials.username);
+    try {
+      const res = await api.post('/authentications', credentials);
+      if (res.data?.data) {
+        setTokens(res.data.data);
+        localStorage.setItem('username', credentials.username);
+      }
+      return res.data;
+    } catch (err) {
+      // Fallback ke mock login jika server backend belum berjalan / offline (Network Error)
+      if (!err.response) {
+        console.warn('Backend server tidak dapat dihubungi, beralih ke mock login fallback:', err.message);
+        await new Promise((r) => setTimeout(r, 400));
+        return this._mockLogin(credentials);
+      }
+      const message = err.response?.data?.message || err.message || 'Login gagal. Periksa username dan password Anda.';
+      throw new Error(message);
     }
-    return res.data;
   },
 
   async logout() {
@@ -142,10 +158,15 @@ export const apiClient = {
     }
     try {
       const refreshToken = localStorage.getItem('refreshToken');
-      await api.delete('/authentications', { data: { refreshToken } });
+      if (refreshToken) {
+        await api.delete('/authentications', { data: { refreshToken } });
+      }
+    } catch (err) {
+      console.warn('Backend logout failed or offline:', err.message);
     } finally {
       clearTokens();
     }
+    return { status: 'success' };
   },
 };
 

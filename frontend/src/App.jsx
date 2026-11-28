@@ -8,66 +8,83 @@ import Footer from './components/common/Footer';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import BenchmarkingPage from './pages/BenchmarkingPage';
+import ExpansionPage from './features/expansion/pages/ExpansionPage';
 
 function ProtectedRoute({ children }) {
-  if (!isAuthenticated()) {
-    return <Navigate to="/login" replace />;
+    // Baca token langsung dari localStorage setiap render
+    const accessToken = typeof window !== 'undefined'
+      ? window.localStorage.getItem('accessToken')
+      : null;
+
+    if (!accessToken) {
+      return <Navigate to="/login" replace />;
+    }
+    return children;
   }
-  return children;
-}
 
-ProtectedRoute.propTypes = {
-  children: PropTypes.node.isRequired,
-};
+  ProtectedRoute.propTypes = {
+    children: PropTypes.node.isRequired,
+  };
 
-function AppLayout({ children }) {
-  return (
-    <div className="min-h-screen flex flex-col bg-slate-50">
-      <Navbar />
-      <main className="flex-1">{children}</main>
-      <Footer />
-    </div>
-  );
-}
+  function AppLayout({ children }) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <Navbar />
+        <main className="flex-1">{children}</main>
+        <Footer />
+      </div>
+    );
+  }
 
-AppLayout.propTypes = {
-  children: PropTypes.node.isRequired,
-};
+  AppLayout.propTypes = {
+    children: PropTypes.node.isRequired,
+  };
 
-export default function App() {
-  return (
-    <LocaleProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Route */}
-          <Route path="/login" element={<LoginPage />} />
+  export default function App() {
+    return (
+      <LocaleProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Route */}
+            <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <DashboardPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/benchmarking"
-            element={
-              <ProtectedRoute>
-                <AppLayout>
-                  <BenchmarkingPage />
-                </AppLayout>
-              </ProtectedRoute>
-            }
-          />
+            {/* Protected Routes */}
+            <Route
+              path="/"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <DashboardPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/benchmarking"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <BenchmarkingPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
 
-          {/* Fallback */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </BrowserRouter>
-    </LocaleProvider>
-  );
-}
+            <Route
+              path="/expansion"
+              element={
+                <ProtectedRoute>
+                  <AppLayout>
+                    <ExpansionPage />
+                  </AppLayout>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </LocaleProvider>
+    );
+  }
