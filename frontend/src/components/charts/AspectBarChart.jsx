@@ -17,6 +17,7 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
   const [granularity, setGranularity] = useState('monthly');
   const [selectedAspect, setSelectedAspect] = useState('rasa');
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
+  const [selectedYear, setSelectedYear] = useState('2026');
 
   const aspectNames = {
     rasa: t.aspectRasa,
@@ -107,7 +108,15 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
     ],
   };
 
-  const periodData = timeSeries?.[granularity] || fallbackData[granularity];
+  const periodData = granularity === 'monthly'
+    ? (timeSeries?.monthly || fallbackData.monthly)
+    : (timeSeries?.daily || fallbackData.daily);
+
+  const monthlySource = timeSeries?.monthly || fallbackData.monthly;
+  const yearOptions = [...new Set(monthlySource
+    .map((item) => getMonthKey(item.period).slice(0, 4))
+    .filter(Boolean))].sort();
+
   const monthOptions = [...new Set(
     (timeSeries?.daily || fallbackData.daily)
       .map((item) => String(item.period).slice(0, 7))
@@ -115,14 +124,18 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
   )].sort();
 
   useEffect(() => {
-    if (monthOptions.length && !monthOptions.includes(selectedMonth)) {
-      setSelectedMonth(monthOptions[monthOptions.length - 1]);
+    if (yearOptions.length && !yearOptions.includes(selectedYear)) {
+      setSelectedYear(yearOptions[yearOptions.length - 1]);
     }
-  }, [monthOptions.join(','), selectedMonth]);
+  }, [yearOptions.join(','), selectedYear]);
+
+  const filteredMonthlyData = granularity === 'monthly'
+    ? periodData.filter((item) => getMonthKey(item.period).startsWith(selectedYear))
+    : [];
 
   const filteredPeriodData = granularity === 'daily'
     ? periodData.filter((item) => String(item.period).startsWith(selectedMonth))
-    : periodData;
+    : filteredMonthlyData;
 
   let chartData;
   if (granularity === 'daily') {
@@ -143,12 +156,17 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
       };
     });
   } else {
-    chartData = filteredPeriodData.map((item) => ({
-      period: formatMonthLabel(item.period),
-      monthKey: getMonthKey(item.period),
-      positive: item[`${selectedAspect}Positive`] || 0,
-      negative: item[`${selectedAspect}Negative`] || 0,
-    }));
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+    chartData = monthNames.map((monthName, index) => {
+      const monthKey = `${selectedYear}-${String(index + 1).padStart(2, '0')}`;
+      const item = filteredPeriodData.find((entry) => getMonthKey(entry.period) === monthKey);
+      return {
+        period: monthName,
+        monthKey,
+        positive: item?.[`${selectedAspect}Positive`] || 0,
+        negative: item?.[`${selectedAspect}Negative`] || 0,
+      };
+    });
   }
 
   const handleChartClick = (state) => {
@@ -179,11 +197,7 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3 mb-4">
         <div>
           <h3 className="text-base font-bold text-slate-900">{t.aspectBreakdown}</h3>
-          <p className="text-xs text-slate-500 mt-1">
-            {granularity === 'monthly'
-              ? 'Sentimen ulasan per bulan dan aspek'
-              : `Sentimen ulasan harian - ${formatMonthLabel(selectedMonth)}`}
-          </p>
+          <p className="text-xs text-slate-500 mt-1">Sentimen ulasan berdasarkan waktu dan aspek</p>
           {granularity === 'monthly' && (
             <p className="text-[11px] text-orange-600 mt-1 font-medium">
               Klik salah satu bulan untuk melihat detail harian
@@ -191,6 +205,17 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {granularity === 'daily' && (
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              min={monthOptions[0]}
+              max={monthOptions[monthOptions.length - 1]}
+              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+              title="Pilih bulan"
+            />
+          )}
           <select
             value={selectedAspect}
             onChange={(e) => setSelectedAspect(e.target.value)}
@@ -200,19 +225,35 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
               <option key={key} value={key}>{aspectNames[key]}</option>
             ))}
           </select>
-          {granularity === 'daily' && (
+          <div className="flex rounded-lg bg-slate-100 p-1">
+            {granularity === 'daily' && (
+              <button
+                type="button"
+                onClick={() => setGranularity('monthly')}
+                className="px-2.5 py-1 rounded-md text-[11px] font-bold text-slate-600 hover:text-slate-900 transition"
+              >
+                ← Bulanan
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setGranularity('daily')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${granularity === 'daily' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+            >
+              Harian
+            </button>
             <button
               type="button"
               onClick={() => setGranularity('monthly')}
-              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition"
+              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${granularity === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
             >
-              ← Kembali ke Bulanan
+              Bulanan
             </button>
-          )}
+          </div>
         </div>
       </div>
 
-      <div className="h-[26rem] w-full">
+      <div className="h-80 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}

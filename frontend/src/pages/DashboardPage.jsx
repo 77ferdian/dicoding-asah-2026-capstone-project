@@ -129,6 +129,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-9 flex">
           <div className="w-full flex">
             <AspectBarChart
+              aspect={aspect}
               aspectBreakdown={summary?.aspectBreakdown}
               timeSeries={summary?.timeSeries}
             />
