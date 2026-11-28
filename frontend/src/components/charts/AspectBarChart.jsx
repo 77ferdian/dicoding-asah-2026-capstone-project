@@ -14,7 +14,7 @@ import { useLocale } from '../../contexts/LocaleContext';
 
 export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
   const { t } = useLocale();
-  const [granularity, setGranularity] = useState('daily');
+  const [granularity, setGranularity] = useState('monthly');
   const [selectedAspect, setSelectedAspect] = useState('rasa');
   const [selectedMonth, setSelectedMonth] = useState('2026-11');
 
@@ -179,7 +179,11 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
       <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-3 mb-4">
         <div>
           <h3 className="text-base font-bold text-slate-900">{t.aspectBreakdown}</h3>
-          <p className="text-xs text-slate-500 mt-1">Sentimen ulasan berdasarkan waktu dan aspek</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {granularity === 'monthly'
+              ? 'Sentimen ulasan per bulan dan aspek'
+              : `Sentimen ulasan harian - ${formatMonthLabel(selectedMonth)}`}
+          </p>
           {granularity === 'monthly' && (
             <p className="text-[11px] text-orange-600 mt-1 font-medium">
               Klik salah satu bulan untuk melihat detail harian
@@ -187,17 +191,6 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {granularity === 'daily' && (
-            <input
-              type="month"
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              min={monthOptions[0]}
-              max={monthOptions[monthOptions.length - 1]}
-              className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
-              title="Pilih bulan"
-            />
-          )}
           <select
             value={selectedAspect}
             onChange={(e) => setSelectedAspect(e.target.value)}
@@ -207,35 +200,19 @@ export default function AspectBarChart({ aspectBreakdown, timeSeries }) {
               <option key={key} value={key}>{aspectNames[key]}</option>
             ))}
           </select>
-          <div className="flex rounded-lg bg-slate-100 p-1">
-            {granularity === 'daily' && (
-              <button
-                type="button"
-                onClick={() => setGranularity('monthly')}
-                className="px-2.5 py-1 rounded-md text-[11px] font-bold text-slate-600 hover:text-slate-900 transition"
-              >
-                ← Bulanan
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setGranularity('daily')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${granularity === 'daily' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
-            >
-              Harian
-            </button>
+          {granularity === 'daily' && (
             <button
               type="button"
               onClick={() => setGranularity('monthly')}
-              className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${granularity === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}
+              className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-700 hover:bg-slate-100 transition"
             >
-              Bulanan
+              ← Kembali ke Bulanan
             </button>
-          </div>
+          )}
         </div>
       </div>
 
-      <div className="h-80 w-full">
+      <div className="h-[26rem] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}

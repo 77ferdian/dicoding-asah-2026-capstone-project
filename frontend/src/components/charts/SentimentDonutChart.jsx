@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { useLocale } from '../../contexts/LocaleContext';
 
 export default function SentimentDonutChart({ summary }) {
@@ -39,13 +39,15 @@ export default function SentimentDonutChart({ summary }) {
         <p className="text-xs text-slate-500 mt-1">Proporsi sentimen ulasan pelanggan Google Maps</p>
       </div>
 
-      <div className="h-64 relative my-2">
+      <div className="h-72 relative my-2">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
-              innerRadius={65}
-              outerRadius={95}
+              cx="50%"
+              cy="47%"
+              innerRadius={68}
+              outerRadius={108}
               paddingAngle={4}
               dataKey="value"
               strokeWidth={0}
@@ -54,15 +56,30 @@ export default function SentimentDonutChart({ summary }) {
                 <Cell key={`cell-${index}`} fill={entry.color} />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend verticalAlign="bottom" height={36} iconType="circle" />
+            <Tooltip
+              content={<CustomTooltip />}
+              position={{ x: 8, y: 8 }}
+              wrapperStyle={{ pointerEvents: 'none', zIndex: 20 }}
+            />
           </PieChart>
         </ResponsiveContainer>
         {/* Center Percentage */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none -mt-7">
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none -mt-2">
           <span className="text-2xl font-black text-slate-800 tracking-tight">{positiveRatio}%</span>
           <span className="text-[10px] font-semibold text-emerald-600 uppercase tracking-wider">{t.positiveSentiment}</span>
         </div>
+      </div>
+
+      <div className="flex items-center justify-center gap-5 pb-3">
+        {data.map((item) => (
+          <div key={item.name} className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+            <span
+              className="w-2.5 h-2.5 rounded-full"
+              style={{ backgroundColor: item.color }}
+            />
+            <span>{item.name}</span>
+          </div>
+        ))}
       </div>
 
       <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 text-center">
